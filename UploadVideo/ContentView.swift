@@ -9,6 +9,7 @@ import SwiftUI
 import AVFoundation
 import PhotosUI
 import AVKit
+import CoreImage.CIFilterBuiltins
 
 struct ContentView: View {
     @State private var selectedItems: [PhotosPickerItem] = []
@@ -19,7 +20,10 @@ struct ContentView: View {
         VStack {
             if let videoPlayer = videoPlayer {
                 VideoPlayer(player: videoPlayer)
-                                .frame(width: 320, height: 180, alignment: .center)
+                    .frame(maxWidth: .infinity,
+                           maxHeight: .infinity,
+                           alignment: .topLeading
+                    )
             }
             Spacer()
             PhotosPicker(
@@ -44,7 +48,42 @@ struct ContentView: View {
                             if !wasFileWritten {
                                 print("File was NOT Written")
                             } else {
-                                videoPlayer = AVPlayer(url: tmpFileURL)
+                                //Create an AVAsset with the url
+                                let videoAsset = AVAsset(url: tmpFileURL)
+                                
+                                let titleComposition = AVMutableVideoComposition(asset: videoAsset) { request in
+                                    
+                                    
+                                    //Create a white shadow for the text
+                                    let whiteShadow = NSShadow()
+                                    whiteShadow.shadowBlurRadius = 5
+                                    whiteShadow.shadowColor = UIColor.white
+                                    let attributes = [
+                                        NSAttributedString.Key.foregroundColor : UIColor.blue,
+                                        NSAttributedString.Key.font : UIFont(name: "Marker Felt", size: 36.0)!,
+                                        NSAttributedString.Key.shadow : whiteShadow
+                                    ]
+                                    
+                                    //Create an Attributed String
+                                    let waterfallText = NSAttributedString(string: "Waterfall!", attributes: attributes)
+                                    
+                                    //Convert attributed string to a CIImage
+                                    let textFilter = CIFilter.attributedTextImageGenerator()
+                                    textFilter.text = waterfallText
+                                    textFilter.scaleFactor = 4.0
+                                    
+                                    //Center text and move 200 px from the origin
+                                    //source image is 720 x 1280
+                                    let positionedText = textFilter.outputImage!.transformed(by: CGAffineTransform(translationX: (request.renderSize.width - textFilter.outputImage!.extent.width)/2, y: 200))
+                                
+                                    
+                                    //Compose text over video image
+                                    request.finish(with: positionedText.composited(over: request.sourceImage), context: nil)
+                                    
+                                }
+                                let avPlayerItem = AVPlayerItem(asset: videoAsset)
+                                avPlayerItem.videoComposition = titleComposition
+                                videoPlayer = AVPlayer(playerItem: avPlayerItem)
                             }
                         } else {
                             print("Data is nil")
@@ -55,6 +94,6 @@ struct ContentView: View {
                 }
             }
         }
-
+        
     }
 }
